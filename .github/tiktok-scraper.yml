@@ -1,0 +1,26 @@
+name: Daily TikTok Scraper
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Runs daily at 10:00 UTC (6:00 AM ET)
+  workflow_dispatch:       # Allows manual run from GitHub UI
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: 3.11
+
+    - name: Install dependencies
+      run: |
+        pip install -r requirements.txt
+
+    - name: Run TikTok Script
+      run: |
+        python TikTokLikesViewsTrends.py
