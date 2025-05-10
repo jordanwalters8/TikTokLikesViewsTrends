@@ -125,3 +125,29 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# Sample data for two users over a few days
+sample_data = pd.DataFrame({
+    "username": ["@user1", "@user1", "@user2", "@user2"],
+    "date": [datetime(2025, 4, 1).date(), datetime(2025, 4, 2).date(),
+             datetime(2025, 4, 1).date(), datetime(2025, 4, 3).date()],
+    "views": [12000, 6000, 8000, 9000],
+    "likes": [800, 400, 600, 700],
+    "comments": [100, 50, 70, 80],
+    "shares": [50, 25, 35, 40],
+    "videos": [2, 1, 1, 1],
+    "likes_per_post": [400.0, 400.0, 600.0, 700.0],
+    "comments_per_post": [50.0, 50.0, 70.0, 80.0],
+    "shares_per_post": [25.0, 25.0, 35.0, 40.0],
+    "views_28day_avg": [None]*4,
+    "likes_28day_avg": [None]*4,
+    "comments_28day_avg": [None]*4,
+    "shares_28day_avg": [None]*4,
+    "videos_28day_avg": [None]*4,
+    "likes_per_post_28day_avg": [None]*4,
+    "comments_per_post_28day_avg": [None]*4,
+    "shares_per_post_28day_avg": [None]*4
+})
+
+# Call your BigQuery upload function
+upload_to_bigquery(sample_data, table_name="likes_views_engagement_test")
