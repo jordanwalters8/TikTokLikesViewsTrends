@@ -1,9 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
 from tikapi import TikAPI, ValidationException, ResponseException
 from datetime import datetime, timedelta
 import pandas as pd
@@ -48,6 +42,8 @@ def fetch_posts_last_year(secUid):
                 "createTime": datetime.utcfromtimestamp(post.get("createTime")),
                 "views": post.get("stats", {}).get("playCount", 0),
                 "likes": post.get("stats", {}).get("diggCount", 0),
+                "comments": post.get("stats", {}).get("commentCount", 0),
+                "shares": post.get("stats", {}).get("shareCount", 0),
             }
             for post in posts
             if datetime.utcfromtimestamp(post.get("createTime")) >= one_year_ago
@@ -56,7 +52,7 @@ def fetch_posts_last_year(secUid):
         print(f"Error fetching posts for {secUid}: {e}")
         return []
 
-# Create daily totals and 28-day rolling averages
+# Create daily totals and rolling engagement metrics
 def build_daily_stats(posts):
     if not posts:
         return pd.DataFrame()
@@ -66,15 +62,23 @@ def build_daily_stats(posts):
 
     daily = df.groupby('date').agg({
         'views': 'sum',
-        'likes': 'sum'
+        'likes': 'sum',
+        'comments': 'sum',
+        'shares': 'sum'
     }).reset_index()
 
     daily['videos'] = df['date'].value_counts().sort_index().values
     daily = daily.set_index('date').asfreq('D', fill_value=0)
 
-    daily['views_28day_avg'] = daily['views'].rolling(window=28).mean()
-    daily['likes_28day_avg'] = daily['likes'].rolling(window=28).mean()
-    daily['videos_28day_avg'] = daily['videos'].rolling(window=28).mean()
+    # Per-post engagement metrics
+    daily['likes_per_post'] = daily['likes'] / daily['videos'].replace(0, pd.NA)
+    daily['comments_per_post'] = daily['comments'] / daily['videos'].replace(0, pd.NA)
+    daily['shares_per_post'] = daily['shares'] / daily['videos'].replace(0, pd.NA)
+
+    # Rolling averages
+    for col in ['views', 'likes', 'comments', 'shares', 'videos', 
+                'likes_per_post', 'comments_per_post', 'shares_per_post']:
+        daily[f'{col}_28day_avg'] = daily[col].rolling(window=28).mean()
 
     return daily.reset_index()
 
@@ -98,10 +102,8 @@ def main():
         else:
             print(f"No posts found for @{user['username']}")
 
-    # Save to CSV for BigQuery / Looker Studio
     all_users_df.to_csv("tiktok_looker_data.csv", index=False)
-    print("Saved combined data to tiktok_looker_data.csv")
+    print("✅ Saved data to tiktok_looker_data.csv")
 
 if __name__ == "__main__":
     main()
-
