@@ -1,0 +1,31 @@
+name: Daily TikTok Likes/Views Scraper
+
+on:
+  schedule:
+    - cron: '0 10 * * *'  # Runs daily at 6:00 AM ET / 10:00 UTC
+  workflow_dispatch:       # Manual trigger from GitHub UI
+
+jobs:
+  run-likes-views-script:
+    runs-on: ubuntu-latest
+    env:
+      TIKAPI_KEY: ${{ secrets.TIKAPI_KEY }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.11
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Decode BigQuery credentials
+        run: echo "${{ secrets.BIGQUERY_KEY }}" | base64 -d > tiktokanalyticskey.json
+
+      - name: Run TikTok Likes/Views Script
+        run: python TikTokLikesViewsTrends.py
