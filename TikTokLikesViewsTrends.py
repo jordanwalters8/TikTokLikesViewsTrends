@@ -1,10 +1,27 @@
 from tikapi import TikAPI, ValidationException, ResponseException
 from datetime import datetime, timedelta
 import pandas as pd
-import time
+from google.cloud import bigquery
+import os
 
-# Initialize TikAPI
-api = TikAPI("8mqoTQs1AXfSs6nskRCr5obvsWVytvQ1J0YPvIS1ylfEtl2D")
+# ✅ Set BigQuery credentials
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "tiktokanalyticskey.json"
+
+# ✅ BigQuery upload function
+def upload_to_bigquery(df, table_name):
+    project_id = "tiktokanalytics-459417"  # 🔁 Replace this
+    dataset_id = "tiktok_data"
+    table_id = f"{project_id}.{dataset_id}.{table_name}"
+
+    client = bigquery.Client()
+    job_config = bigquery.LoadJobConfig(autodetect=True)
+
+    job = client.load_table_from_dataframe(df, table_id, job_config=job_config)
+    job.result()
+    print(f"✅ Uploaded {len(df)} rows to {table_id}")
+
+# 🔍 TikAPI key
+api = TikAPI(os.environ.get("TIKAPI_KEY"))
 
 # Fetch followed users
 def fetch_following_users(secUid):
@@ -85,7 +102,6 @@ def build_daily_stats(posts):
 # Main workflow
 def main():
     main_secUid = "MS4wLjABAAAAboanSl94WMrjvJtHejLumdRGgy9oYuygOQfbC-iVne34BIfjcygpqSH84qsh2XcT"
-
     print("Fetching followed users...")
     users = fetch_following_users(main_secUid)
 
@@ -102,8 +118,10 @@ def main():
         else:
             print(f"No posts found for @{user['username']}")
 
-    all_users_df.to_csv("tiktok_looker_data.csv", index=False)
-    print("✅ Saved data to tiktok_looker_data.csv")
+    if not all_users_df.empty:
+        upload_to_bigquery(all_users_df, table_name="likes_views_engagement")
+    else:
+        print("⚠️ No data to upload.")
 
 if __name__ == "__main__":
     main()
