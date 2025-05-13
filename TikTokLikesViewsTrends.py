@@ -181,6 +181,15 @@ def main():
 
     if slope_summaries:
         slope_df = pd.DataFrame(slope_summaries)
+
+        # Calculate heat_score_plus (normalized where 100 = average)
+        heat_scores = slope_df[slope_df['metric'] == 'heat_score']
+        if not heat_scores.empty:
+            avg_heat = heat_scores['slope'].mean()
+            slope_df.loc[slope_df['metric'] == 'heat_score', 'heat_score_plus'] = (
+                slope_df[slope_df['metric'] == 'heat_score']['slope'] / avg_heat * 100
+            )
+
         upload_to_bigquery(slope_df, table_name="artist_growth_summary")
     else:
         print("⚠️ No slope data to upload.")
