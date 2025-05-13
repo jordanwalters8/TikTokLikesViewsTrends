@@ -101,7 +101,7 @@ def build_daily_stats(posts):
 
     return daily.reset_index()
 
-# Calculate growth slopes over different periods
+# Calculate growth slopes and custom metrics
 def calculate_slopes(df, username):
     today = df['date'].max()
     results = []
@@ -124,6 +124,34 @@ def calculate_slopes(df, username):
                 'slope_window': label,
                 'slope': slope
             })
+
+    # Additional custom metrics based on the last 2 weeks vs previous 2 weeks
+    recent = df[df['date'] >= (today - timedelta(days=14))]
+    prev = df[(df['date'] < (today - timedelta(days=14))) & (df['date'] >= (today - timedelta(days=28)))]
+
+    if not recent.empty and not prev.empty:
+        velocity = recent['views'].sum() - prev['views'].sum()
+        momentum_score = (recent['views'].sum() / prev['views'].sum()) if prev['views'].sum() > 0 else None
+        heat_score = velocity * (recent['engagement_rate'].mean() if not pd.isna(recent['engagement_rate'].mean()) else 1)
+
+        results.append({
+            'username': username,
+            'metric': 'velocity',
+            'slope_window': '14_day_delta',
+            'slope': velocity
+        })
+        results.append({
+            'username': username,
+            'metric': 'momentum_score',
+            'slope_window': '2wk_ratio',
+            'slope': momentum_score
+        })
+        results.append({
+            'username': username,
+            'metric': 'heat_score',
+            'slope_window': 'engagement_weighted',
+            'slope': heat_score
+        })
 
     return results
 
