@@ -69,7 +69,6 @@ def fetch_posts_last_year(secUid):
         print(f"Error fetching posts for {secUid}: {e}")
         return []
 
-# Create daily totals and rolling engagement metrics
 def build_daily_stats(posts):
     if not posts:
         return pd.DataFrame()
@@ -91,13 +90,21 @@ def build_daily_stats(posts):
     daily['likes_per_post'] = daily['likes'] / daily['videos'].replace(0, pd.NA)
     daily['comments_per_post'] = daily['comments'] / daily['videos'].replace(0, pd.NA)
     daily['shares_per_post'] = daily['shares'] / daily['videos'].replace(0, pd.NA)
+    daily['views_per_post'] = daily['views'] / daily['videos'].replace(0, pd.NA)
+
+    # 🔥 Overall engagement rate per day
+    daily['engagement_rate'] = (
+        (daily['likes'] + daily['comments'] + daily['shares']) / daily['views'].replace(0, pd.NA)
+    )
 
     # Rolling averages
-    for col in ['views', 'likes', 'comments', 'shares', 'videos', 
-                'likes_per_post', 'comments_per_post', 'shares_per_post']:
+    for col in ['views', 'likes', 'comments', 'shares', 'videos',
+                'likes_per_post', 'comments_per_post', 'shares_per_post',
+                'views_per_post', 'engagement_rate']:
         daily[f'{col}_28day_avg'] = daily[col].rolling(window=28).mean()
 
     return daily.reset_index()
+
 
 # Main workflow
 def main():
