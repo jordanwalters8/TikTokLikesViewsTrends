@@ -2,6 +2,7 @@ from tikapi import TikAPI, ValidationException, ResponseException
 from datetime import datetime, timedelta
 import pandas as pd
 from google.cloud import bigquery
+from scipy.stats import linregress
 import os
 
 # ✅ Set BigQuery credentials
@@ -9,7 +10,7 @@ os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "tiktokanalyticskey.json"
 
 # ✅ BigQuery upload function
 def upload_to_bigquery(df, table_name):
-    project_id = "tiktokanalytics-459417"  # 🔁 Replace this
+    project_id = "tiktokanalytics-459417"
     dataset_id = "tiktok_data"
     table_id = f"{project_id}.{dataset_id}.{table_name}"
 
@@ -69,6 +70,7 @@ def fetch_posts_last_year(secUid):
         print(f"Error fetching posts for {secUid}: {e}")
         return []
 
+# Create daily totals and rolling engagement metrics
 def build_daily_stats(posts):
     if not posts:
         return pd.DataFrame()
@@ -86,18 +88,12 @@ def build_daily_stats(posts):
     daily['videos'] = df['date'].value_counts().sort_index().values
     daily = daily.set_index('date').asfreq('D', fill_value=0)
 
-    # Per-post engagement metrics
     daily['likes_per_post'] = daily['likes'] / daily['videos'].replace(0, pd.NA)
     daily['comments_per_post'] = daily['comments'] / daily['videos'].replace(0, pd.NA)
     daily['shares_per_post'] = daily['shares'] / daily['videos'].replace(0, pd.NA)
     daily['views_per_post'] = daily['views'] / daily['videos'].replace(0, pd.NA)
+    daily['engagement_rate'] = (daily['likes'] + daily['comments'] + daily['shares']) / daily['views'].replace(0, pd.NA)
 
-    # 🔥 Overall engagement rate per day
-    daily['engagement_rate'] = (
-        (daily['likes'] + daily['comments'] + daily['shares']) / daily['views'].replace(0, pd.NA)
-    )
-
-    # Rolling averages
     for col in ['views', 'likes', 'comments', 'shares', 'videos',
                 'likes_per_post', 'comments_per_post', 'shares_per_post',
                 'views_per_post', 'engagement_rate']:
@@ -105,6 +101,31 @@ def build_daily_stats(posts):
 
     return daily.reset_index()
 
+# Calculate growth slopes over different periods
+def calculate_slopes(df, username):
+    today = df['date'].max()
+    results = []
+
+    for metric in ['views', 'likes', 'engagement_rate']:
+        for label, days in [('slope_3mo', 90), ('slope_6mo', 180), ('slope_12mo', 365)]:
+            cutoff = today - timedelta(days=days)
+            subset = df[df['date'] >= cutoff]
+
+            if len(subset) > 1:
+                x = pd.to_datetime(subset['date']).map(datetime.toordinal)
+                y = subset[metric]
+                slope = linregress(x, y).slope
+            else:
+                slope = None
+
+            results.append({
+                'username': username,
+                'metric': metric,
+                'slope_window': label,
+                'slope': slope
+            })
+
+    return results
 
 # Main workflow
 def main():
@@ -113,6 +134,7 @@ def main():
     users = fetch_following_users(main_secUid)
 
     all_users_df = pd.DataFrame()
+    slope_summaries = []
 
     for user in users:
         print(f"Processing @{user['username']}")
@@ -122,39 +144,18 @@ def main():
         if not df_stats.empty:
             df_stats['username'] = user['username']
             all_users_df = pd.concat([all_users_df, df_stats], ignore_index=True)
+            slope_summaries.extend(calculate_slopes(df_stats, user['username']))
         else:
             print(f"No posts found for @{user['username']}")
 
     if not all_users_df.empty:
         upload_to_bigquery(all_users_df, table_name="likes_views_engagement")
+
+    if slope_summaries:
+        slope_df = pd.DataFrame(slope_summaries)
+        upload_to_bigquery(slope_df, table_name="artist_growth_summary")
     else:
-        print("⚠️ No data to upload.")
+        print("⚠️ No slope data to upload.")
 
 if __name__ == "__main__":
     main()
-
-# Sample data for two users over a few days
-sample_data = pd.DataFrame({
-    "username": ["@user1", "@user1", "@user2", "@user2"],
-    "date": [datetime(2025, 4, 1).date(), datetime(2025, 4, 2).date(),
-             datetime(2025, 4, 1).date(), datetime(2025, 4, 3).date()],
-    "views": [12000, 6000, 8000, 9000],
-    "likes": [800, 400, 600, 700],
-    "comments": [100, 50, 70, 80],
-    "shares": [50, 25, 35, 40],
-    "videos": [2, 1, 1, 1],
-    "likes_per_post": [400.0, 400.0, 600.0, 700.0],
-    "comments_per_post": [50.0, 50.0, 70.0, 80.0],
-    "shares_per_post": [25.0, 25.0, 35.0, 40.0],
-    "views_28day_avg": [None]*4,
-    "likes_28day_avg": [None]*4,
-    "comments_28day_avg": [None]*4,
-    "shares_28day_avg": [None]*4,
-    "videos_28day_avg": [None]*4,
-    "likes_per_post_28day_avg": [None]*4,
-    "comments_per_post_28day_avg": [None]*4,
-    "shares_per_post_28day_avg": [None]*4
-})
-
-# Call your BigQuery upload function
-upload_to_bigquery(sample_data, table_name="likes_views_engagement_test")
