@@ -134,26 +134,29 @@ def calculate_slopes(df, username):
                 'slope': slope
             })
 
-    # Additional custom metrics based on the last 2 weeks vs previous 2 weeks
+    # Additional custom metrics with safeguards
     recent = df[df['date'] >= (today - timedelta(days=14))]
     prev = df[(df['date'] < (today - timedelta(days=14))) & (df['date'] >= (today - timedelta(days=28)))]
 
-    if not recent.empty and not prev.empty:
-        velocity = recent['views'].sum() - prev['views'].sum()
-        momentum_score = (recent['views'].sum() / prev['views'].sum()) if prev['views'].sum() > 0 else None
-        heat_score = velocity * (recent['engagement_rate'].mean() if not pd.isna(recent['engagement_rate'].mean()) else 1)
+    prev_views = prev['views'].sum()
+    recent_views = recent['views'].sum()
+
+    if not recent.empty and not prev.empty and prev_views >= 1000:
+        velocity_ratio = (recent_views - prev_views) / prev_views
+        avg_engagement = recent['engagement_rate'].mean() if not pd.isna(recent['engagement_rate'].mean()) else 1
+        heat_score = velocity_ratio * avg_engagement
 
         results.append({
             'username': username,
-            'metric': 'velocity',
-            'slope_window': '14_day_delta',
-            'slope': velocity
+            'metric': 'velocity_ratio',
+            'slope_window': '14_day_ratio',
+            'slope': velocity_ratio
         })
         results.append({
             'username': username,
             'metric': 'momentum_score',
             'slope_window': '2wk_ratio',
-            'slope': momentum_score
+            'slope': velocity_ratio  # using the same value for simplicity
         })
         results.append({
             'username': username,
