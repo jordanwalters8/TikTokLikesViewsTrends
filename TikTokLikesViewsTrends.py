@@ -24,6 +24,15 @@ def upload_to_bigquery(df, table_name):
 # 🔍 TikAPI key
 api = TikAPI(os.environ.get("TIKAPI_KEY"))
 
+# 📌 List of Sony Music Nashville usernames
+SONY_SIGNED_USERS = {
+    "alanaspringsteen", "tigirlilygold", "mccoymooremusic", "bradtursi", "brooksanddunn",
+    "coreykent", "davidjcountry", "dylanmarlowemusic", "gavindegraw", "grahambarham",
+    "kameronmarlowe", "kanebrown", "karleyscottcollins", "katlunamusic", "kayleygreenmusic",
+    "lukecombs", "meganmoroney", "m10penny", "morganwademusic", "natesmithmusic",
+    "olddominionband", "vavomusic", "zachjohnking"
+}
+
 # Fetch followed users
 def fetch_following_users(secUid):
     try:
@@ -171,6 +180,7 @@ def main():
 
         if not df_stats.empty:
             df_stats['username'] = user['username']
+            df_stats['sony_signed'] = int(user['username'].lower() in SONY_SIGNED_USERS)
             all_users_df = pd.concat([all_users_df, df_stats], ignore_index=True)
             slope_summaries.extend(calculate_slopes(df_stats, user['username']))
         else:
